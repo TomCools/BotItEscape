@@ -7,24 +7,18 @@ import java.math.*;
  * the standard input according to the problem statement.
  **/
 class Player {
-    static int h;
-    static int w;
-
-    static List<Path> path;
-
     public static void main(String args[]) {
         Scanner in = new Scanner(System.in);
-        w = in.nextInt(); // width of the board
-        h = in.nextInt(); // height of the board
+        int w = in.nextInt(); // width of the board
+        int h = in.nextInt(); // height of the board
         int playerCount = in.nextInt(); // number of players (2 or 3)
         int myId = in.nextInt(); // id of my player (0 = 1st player, 1 = 2nd player, ...)
 
-        Dragon me = null;
-        List<Wall> walls;
+
         // game loop
         while (true) {
-            path = new ArrayList<>();
-
+            Dragon me = null;
+            List<Wall> walls;
             for (int i = 0; i < playerCount; i++) {
                 int x = in.nextInt(); // x-coordinate of the player
                 int y = in.nextInt(); // y-coordinate of the player
@@ -45,60 +39,94 @@ class Player {
 
             // Write an action using System.out.println()
             // To debug: System.err.println("Debug messages...");
-            calculatePaths(me.x, me.y, w - 1, me.y, walls, new ArrayList<>(), 10);
-            Optional<Path> bestPath = Player.path.stream().min(Comparator.comparingInt(c -> c.getMoves().size()));
-            bestPath.ifPresent(p -> {
-                //System.err.println("Shortest Path: ");
-                //for (Move move : p.getMoves()) {
-                //    System.err.println(move);
-                //}
-                Move move = p.getMoves().get(0);
-                //System.err.println("Using path definition");
-                System.out.println(move.getDefinition());
-            });
-
-            //System.out.println("No Path Found! :(");
+            Round round = new Round(h, w, walls, me, new ArrayList<>());
+            String calculatedMove = round.calculateMove();
+            System.out.println(calculatedMove);
         }
     }
 
-    private static void calculatePaths(int x, int y, int tX, int tY, List<Wall> walls, List<Move> moves, int depth) {
+    static class Round {
+        int boardHeight;
+        int boardWidth;
+        List<Player.Wall> walls;
+        Player.Dragon me;
+        List<Player.Dragon> others;
 
-        if (x == tX && y == tY) {
-            System.err.println("Path added");
-            path.add(new Path(moves));
-        } else if (depth == 0) {
-            //end
-        } else {
-            //Move to the right
-            boolean hasNotBeenThere = moves.stream().noneMatch(m -> m.x == x + 1 && m.y == y);
-            boolean xSmallerThanEdge = x + 1 < w;
-            boolean doesNotHitWall = walls.stream().filter(w -> !w.isHorizontal()).noneMatch(w -> w.blocks(x, y, x + 1, y));
-            //System.err.println("Does not hit wall:" + doesNotHitWall +" Has not been there: " + hasNotBeenThere + " x smaller than edge:" + xSmallerThanEdge);
-            if (doesNotHitWall
-                    && xSmallerThanEdge
-                    && hasNotBeenThere) {
-                List<Move> newMoves = new ArrayList<>(moves);
-                newMoves.add(new Move(1, 0, x, y));
-                calculatePaths(x + 1, y, tX, tY, walls, newMoves, depth - 1);
-            } if(walls.stream().filter(w -> !w.isHorizontal()).noneMatch(w -> w.blocks(x +1, y, x, y))
-                    && x-1 >= 0
-                    && moves.stream().noneMatch(m -> m.x == x-1 && m.y == y)) {
-                List<Move> newMoves = new ArrayList<>(moves);
-                newMoves.add(new Move(-1,0,x,y));
-                calculatePaths(x-1,y,tX,tY, walls, newMoves, depth-1);
-            } if(walls.stream().filter(Wall::isHorizontal).noneMatch(w -> w.blocks(x, y, x, y+1))
-                    && y+1 < h
-                    && moves.stream().noneMatch(m -> m.x == x && m.y+1 == y)) {
-                List<Move> newMoves = new ArrayList<>(moves);
-                newMoves.add(new Move(0,1,x,y));
-                calculatePaths(x,y+1,tX,tY, walls, newMoves, depth-1);
-            } if(walls.stream().filter(Wall::isHorizontal).noneMatch(w -> w.blocks(x, y+1, x, y))
-                    && y-1 >= 0
-                    && moves.stream().noneMatch(m -> m.x == x && m.y-1 == y)) {
-                List<Move> newMoves = new ArrayList<>(moves);
-                newMoves.add(new Move(0,-1,x,y));
-                calculatePaths(x,y-1,tX,tY, walls, newMoves, depth-1);
+        public Round(int boardHeight, int boardWidth, List<Player.Wall> walls, Player.Dragon me, List<Player.Dragon> others) {
+            this.boardHeight = boardHeight;
+            this.boardWidth = boardWidth;
+            this.walls = walls;
+            this.me = me;
+            this.others = others;
+        }
+
+        public String calculateMove() {
+            List<Player.Path> paths = new ArrayList<>();
+            //for (int i = 0; i < boardHeight; i++) {
+            //    calculatePaths(me.x, me.y, boardWidth - 1, me.y, new ArrayList<>(), paths, 10);
+            //}
+            calculatePaths(me.x, me.y, boardWidth - 1, me.y, new ArrayList<>(), paths, 10);
+            Optional<Player.Path> bestPath = paths.stream().min(Comparator.comparingInt(c -> c.getMoves().size()));
+            return bestPath.get().getMoves().get(0).getDefinition();
+        }
+
+        private void calculatePaths(int x, int y, int tX, int tY, List<Player.Move> moves, List<Player.Path> paths, int depth) {
+
+            if (x == tX && y == tY) {
+                System.err.println("Path added");
+                paths.add(new Player.Path(moves));
+            } else if (depth == 0) {
+                //end
+            } else {
+                if (canGoRight(x, y, moves)) {
+                    List<Player.Move> newMoves = new ArrayList<>(moves);
+                    newMoves.add(new Player.Move(1, 0, x, y));
+                    calculatePaths(x + 1, y, tX, tY, newMoves, paths, depth - 1);
+                }
+                if (canGoLeft(x, y, moves)) {
+                    List<Player.Move> newMoves = new ArrayList<>(moves);
+                    newMoves.add(new Player.Move(-1, 0, x, y));
+                    calculatePaths(x - 1, y, tX, tY, newMoves, paths, depth - 1);
+                }
+                if (canGoDown(x, y, moves)) {
+                    List<Player.Move> newMoves = new ArrayList<>(moves);
+                    newMoves.add(new Player.Move(0, 1, x, y));
+                    calculatePaths(x, y + 1, tX, tY, newMoves, paths, depth - 1);
+                }
+                if (canGoUp(x, y, moves)) {
+                    List<Player.Move> newMoves = new ArrayList<>(moves);
+                    newMoves.add(new Player.Move(0, -1, x, y));
+                    calculatePaths(x, y - 1, tX, tY, newMoves, paths, depth - 1);
+                }
             }
+        }
+
+        private boolean canGoUp(int x, int y, List<Player.Move> moves) {
+            return walls.stream().filter(Player.Wall::isHorizontal).noneMatch(w -> w.blocks(x, y + 1, x, y))
+                    && y - 1 >= 0
+                    && hasNotBeenAtLocation(moves, x, y - 1);
+        }
+
+        private boolean canGoDown(int x, int y, List<Player.Move> moves) {
+            return walls.stream().filter(Player.Wall::isHorizontal).noneMatch(w -> w.blocks(x, y, x, y + 1))
+                    && y + 1 < this.boardHeight
+                    && hasNotBeenAtLocation(moves, x, y + 1);
+        }
+
+        private boolean canGoLeft(int x, int y, List<Player.Move> moves) {
+            return walls.stream().filter(w -> !w.isHorizontal()).noneMatch(w -> w.blocks(x + 1, y, x, y))
+                    && x - 1 >= 0
+                    && hasNotBeenAtLocation(moves, x - 1, y);
+        }
+
+        private boolean canGoRight(int x, int y, List<Player.Move> moves) {
+            return walls.stream().filter(w -> !w.isHorizontal()).noneMatch(w -> w.blocks(x, y, x + 1, y))
+                    && x + 1 < this.boardWidth
+                    && hasNotBeenAtLocation(moves, x + 1, y);
+        }
+
+        private boolean hasNotBeenAtLocation(List<Player.Move> moves, int newX, int newY) {
+            return moves.stream().noneMatch(m -> m.x == newX && m.y == newY);
         }
     }
 
@@ -206,11 +234,10 @@ class Player {
         }
 
         public boolean blocks(int x1, int y1, int x2, int y2) {
-            //System.err.println("Blocks? : " + x + y + isHorizontal);
             if (!isHorizontal) {
-                return (x1 == x - 1 && x2 == x && y1 >= y && y1 < y + 2);
+                return (x1 == x - 1 && x2 == x && y1 >= y && y1 < y + LENGTH);
             } else {
-                return (y1 == y - 1 && y2 == y && x1 >= x && x1 < x + 2);
+                return (y1 == y - 1 && y2 == y && x1 >= x && x1 < x + LENGTH);
             }
         }
     }
