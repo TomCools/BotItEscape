@@ -51,6 +51,7 @@ class Player {
         List<Player.Wall> walls;
         Player.Dragon me;
         List<Player.Dragon> others;
+        List<Player.Path> paths = new ArrayList<>();
 
         public Round(int boardHeight, int boardWidth, List<Player.Wall> walls, Player.Dragon me, List<Player.Dragon> others) {
             this.boardHeight = boardHeight;
@@ -61,7 +62,6 @@ class Player {
         }
 
         public String calculateMove() {
-            List<Player.Path> paths = new ArrayList<>();
             //for (int i = 0; i < boardHeight; i++) {
             //    calculatePaths(me.x, me.y, boardWidth - 1, me.y, new ArrayList<>(), paths, 10);
             //}
@@ -80,22 +80,22 @@ class Player {
             } else {
                 if (canGoRight(x, y, moves)) {
                     List<Player.Move> newMoves = new ArrayList<>(moves);
-                    newMoves.add(new Player.Move(1, 0, x, y));
+                    newMoves.add(new Player.Move(moves.size(),1, 0, x, y));
                     calculatePaths(x + 1, y, tX, tY, newMoves, paths, depth - 1);
                 }
                 if (canGoLeft(x, y, moves)) {
                     List<Player.Move> newMoves = new ArrayList<>(moves);
-                    newMoves.add(new Player.Move(-1, 0, x, y));
+                    newMoves.add(new Player.Move(moves.size(),-1, 0, x, y));
                     calculatePaths(x - 1, y, tX, tY, newMoves, paths, depth - 1);
                 }
                 if (canGoDown(x, y, moves)) {
                     List<Player.Move> newMoves = new ArrayList<>(moves);
-                    newMoves.add(new Player.Move(0, 1, x, y));
+                    newMoves.add(new Player.Move(moves.size(),0, 1, x, y));
                     calculatePaths(x, y + 1, tX, tY, newMoves, paths, depth - 1);
                 }
                 if (canGoUp(x, y, moves)) {
                     List<Player.Move> newMoves = new ArrayList<>(moves);
-                    newMoves.add(new Player.Move(0, -1, x, y));
+                    newMoves.add(new Player.Move(moves.size(),0, -1, x, y));
                     calculatePaths(x, y - 1, tX, tY, newMoves, paths, depth - 1);
                 }
             }
@@ -128,15 +128,21 @@ class Player {
         private boolean hasNotBeenAtLocation(List<Player.Move> moves, int newX, int newY) {
             return moves.stream().noneMatch(m -> m.x == newX && m.y == newY);
         }
+
+        private boolean otherPathIsShorterFromThisLocation(int x, int y, int number) {
+            return paths.stream().anyMatch(p -> p.getMoves().stream().anyMatch(m -> m.x == x && m.y == y && m.nr <= number));
+        }
     }
 
     static class Move {
+        int nr;
         int deltaX;
         int deltaY;
         int x;
         int y;
 
-        public Move(int deltaX, int deltaY, int x, int y) {
+        public Move(int nr, int deltaX, int deltaY, int x, int y) {
+            this.nr = nr;
             this.deltaX = deltaX;
             this.deltaY = deltaY;
             this.x = x;
