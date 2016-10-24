@@ -79,7 +79,7 @@ class Player {
             this.walls = walls;
             this.me = me;
             this.others = others;
-            this.heighestRemainingMovesForEachPosition = new int[boardHeight][boardHeight];
+            this.heighestRemainingMovesForEachPosition = new int[boardWidth][boardHeight];
         }
 
         public String calculateMove() {
