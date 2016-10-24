@@ -9,6 +9,7 @@ class Player {
     static int targetX;
     static int targetY;
     static int enemyY;
+
     public static void main(String args[]) {
         Scanner in = new Scanner(System.in);
         int w = in.nextInt(); // width of the board
@@ -39,9 +40,9 @@ class Player {
                 } else if (myId == 1) {
                     targetX = 0;
                     targetY = me.y;
-                } else if(myId == 2) {
+                } else if (myId == 2) {
                     targetX = me.x;
-                    targetY = h-1;
+                    targetY = h - 1;
                 }
                 System.err.println("TARGET: " + targetX + ":" + targetY);
             }
@@ -70,6 +71,7 @@ class Player {
         Player.Dragon me;
         List<Player.Dragon> others;
         List<Player.Path> paths = new ArrayList<>();
+        int[][] heighestRemainingMovesForEachPosition;
 
         public Round(int boardHeight, int boardWidth, List<Player.Wall> walls, Player.Dragon me, List<Player.Dragon> others) {
             this.boardHeight = boardHeight;
@@ -77,6 +79,7 @@ class Player {
             this.walls = walls;
             this.me = me;
             this.others = others;
+            this.heighestRemainingMovesForEachPosition = new int[boardHeight][boardHeight];
         }
 
         public String calculateMove() {
@@ -86,37 +89,68 @@ class Player {
         }
 
         private void calculatePaths(int x, int y, int tX, int tY, List<Player.Move> moves, List<Player.Path> paths, int depth) {
-
-            if (x == tX && (me.getId() == 0 || me.getId() == 1)) {
-                //System.err.println("Path added");
-                paths.add(new Player.Path(moves));
-            } else if (y == tY && me.getId() == 2) {
+            if (reachedHorizontalTarget(x, tX) || reachedVerticalTarget(y, tY)) {
                 //System.err.println("Path added");
                 paths.add(new Player.Path(moves));
             } else if (depth == 0) {
-                //end
+                //end reached, don't spend more energy on trying to find the path
             } else {
-                if (canGoRight(x, y, moves)) {
-                    List<Player.Move> newMoves = new ArrayList<>(moves);
-                    newMoves.add(new Player.Move(moves.size(), 1, 0, x, y));
-                    calculatePaths(x + 1, y, tX, tY, newMoves, paths, depth - 1);
+                if (isShorterThanPreviousPathAttempt(x, y, depth)) {
+                    attemptRight(x, y, tX, tY, moves, paths, depth);
+                    attemptLeft(x, y, tX, tY, moves, paths, depth);
+                    attemptDown(x, y, tX, tY, moves, paths, depth);
+                    attemptUp(x, y, tX, tY, moves, paths, depth);
                 }
-                if (canGoLeft(x, y, moves)) {
-                    List<Player.Move> newMoves = new ArrayList<>(moves);
-                    newMoves.add(new Player.Move(moves.size(), -1, 0, x, y));
-                    calculatePaths(x - 1, y, tX, tY, newMoves, paths, depth - 1);
-                }
-                if (canGoDown(x, y, moves)) {
-                    List<Player.Move> newMoves = new ArrayList<>(moves);
-                    newMoves.add(new Player.Move(moves.size(), 0, 1, x, y));
-                    calculatePaths(x, y + 1, tX, tY, newMoves, paths, depth - 1);
-                }
-                if (canGoUp(x, y, moves)) {
-                    List<Player.Move> newMoves = new ArrayList<>(moves);
-                    newMoves.add(new Player.Move(moves.size(), 0, -1, x, y));
-                    calculatePaths(x, y - 1, tX, tY, newMoves, paths, depth - 1);
-                }
+
             }
+        }
+
+        private void attemptUp(int x, int y, int tX, int tY, List<Move> moves, List<Path> paths, int depth) {
+            if (canGoUp(x, y, moves)) {
+                List<Move> newMoves = new ArrayList<>(moves);
+                newMoves.add(new Move(moves.size(), 0, -1, x, y));
+                calculatePaths(x, y - 1, tX, tY, newMoves, paths, depth - 1);
+            }
+        }
+
+        private void attemptDown(int x, int y, int tX, int tY, List<Move> moves, List<Path> paths, int depth) {
+            if (canGoDown(x, y, moves)) {
+                List<Move> newMoves = new ArrayList<>(moves);
+                newMoves.add(new Move(moves.size(), 0, 1, x, y));
+                calculatePaths(x, y + 1, tX, tY, newMoves, paths, depth - 1);
+            }
+        }
+
+        private void attemptLeft(int x, int y, int tX, int tY, List<Move> moves, List<Path> paths, int depth) {
+            if (canGoLeft(x, y, moves)) {
+                List<Move> newMoves = new ArrayList<>(moves);
+                newMoves.add(new Move(moves.size(), -1, 0, x, y));
+                calculatePaths(x - 1, y, tX, tY, newMoves, paths, depth - 1);
+            }
+        }
+
+        private void attemptRight(int x, int y, int tX, int tY, List<Move> moves, List<Path> paths, int depth) {
+            if (canGoRight(x, y, moves)) {
+                List<Move> newMoves = new ArrayList<>(moves);
+                newMoves.add(new Move(moves.size(), 1, 0, x, y));
+                calculatePaths(x + 1, y, tX, tY, newMoves, paths, depth - 1);
+            }
+        }
+
+        private boolean isShorterThanPreviousPathAttempt(int x, int y, int depth) {
+            if (heighestRemainingMovesForEachPosition[x][y] < depth) {
+                heighestRemainingMovesForEachPosition[x][y] = depth;
+                return true;
+            }
+            return false;
+        }
+
+        private boolean reachedVerticalTarget(int y, int tY) {
+            return y == tY && me.getId() == 2;
+        }
+
+        private boolean reachedHorizontalTarget(int x, int tX) {
+            return x == tX && (me.getId() == 0 || me.getId() == 1);
         }
 
         private boolean canGoUp(int x, int y, List<Player.Move> moves) {
@@ -132,7 +166,7 @@ class Player {
         }
 
         private boolean canGoLeft(int x, int y, List<Player.Move> moves) {
-            return walls.stream().filter(w -> !w.isHorizontal()).noneMatch(w -> w.blocks(x-1, y, x, y))
+            return walls.stream().filter(w -> !w.isHorizontal()).noneMatch(w -> w.blocks(x - 1, y, x, y))
                     && x - 1 >= 0
                     && hasNotBeenAtLocation(moves, x - 1, y);
         }
@@ -145,10 +179,6 @@ class Player {
 
         private boolean hasNotBeenAtLocation(List<Player.Move> moves, int newX, int newY) {
             return moves.stream().noneMatch(m -> m.x == newX && m.y == newY);
-        }
-
-        private boolean otherPathIsShorterFromThisLocation(int x, int y, int number) {
-            return paths.stream().anyMatch(p -> p.getMoves().stream().anyMatch(m -> m.x == x && m.y == y && m.nr <= number));
         }
     }
 
