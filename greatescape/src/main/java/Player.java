@@ -5,6 +5,7 @@ import java.util.*;
  * the standard input according to the problem statement.
  **/
 class Player {
+    static final int DEPTH = 40;
     static int roundCounter = 0;
     static int targetX;
     static int targetY;
@@ -83,7 +84,7 @@ class Player {
         }
 
         public String calculateMove() {
-            calculatePaths(me.x, me.y, targetX, targetY, new ArrayList<>(), paths, 10);
+            calculatePaths(me.x, me.y, targetX, targetY, new ArrayList<>(), paths, DEPTH);
             Optional<Player.Path> bestPath = paths.stream().min(Comparator.comparingInt(c -> c.getMoves().size()));
             return bestPath.get().getMoves().get(0).getDefinition();
         }
