@@ -8,7 +8,7 @@ class Player {
     static int roundCounter = 0;
     static int targetX;
     static int targetY;
-
+    static int enemyY;
     public static void main(String args[]) {
         Scanner in = new Scanner(System.in);
         int w = in.nextInt(); // width of the board
@@ -28,6 +28,8 @@ class Player {
                 int wallsLeft = in.nextInt(); // number of walls available for the player
                 if (i == myId) {
                     me = new Dragon(i, x, y, wallsLeft);
+                } else {
+                    enemyY = y;
                 }
             }
             if (roundCounter == 1) {
@@ -41,6 +43,7 @@ class Player {
                     targetX = me.x;
                     targetY = h-1;
                 }
+                System.err.println("TARGET: " + targetX + ":" + targetY);
             }
             int wallCount = in.nextInt(); // number of walls on the board
             walls = new ArrayList<Wall>();
@@ -55,7 +58,8 @@ class Player {
             // To debug: System.err.println("Debug messages...");
             Round round = new Round(h, w, walls, me, new ArrayList<>());
             String calculatedMove = round.calculateMove();
-            System.out.println(calculatedMove);
+            System.out.println(calculatedMove + " FOR FRODO!");
+
         }
     }
 
@@ -83,8 +87,11 @@ class Player {
 
         private void calculatePaths(int x, int y, int tX, int tY, List<Player.Move> moves, List<Player.Path> paths, int depth) {
 
-            if (x == tX && y == tY) {
-                System.err.println("Path added");
+            if (x == tX && (me.getId() == 0 || me.getId() == 1)) {
+                //System.err.println("Path added");
+                paths.add(new Player.Path(moves));
+            } else if (y == tY && me.getId() == 2) {
+                //System.err.println("Path added");
                 paths.add(new Player.Path(moves));
             } else if (depth == 0) {
                 //end
