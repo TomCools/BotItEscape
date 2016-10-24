@@ -55,10 +55,10 @@ class Player {
     static int[] calculateTarget(int startX, int startY, int width, int height) {
         int[] result = new int[2];
         if (startX == 0 || startX == width - 1) {
-            result[0] = Math.abs(startY - width);
+            result[0] = Math.abs(startY - width -1);
             result[1] = startY;
         } else if (startY == 0 || startY == height - 1) {
-            result[1] = Math.abs(startY - height);
+            result[1] = Math.abs(startY - height -1);
             result[0] = startX;
         } else {
             throw new IllegalStateException("Couldn't calculate correct target");
