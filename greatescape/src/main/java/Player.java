@@ -120,7 +120,7 @@ class Player {
         }
 
         private boolean canGoUp(int x, int y, List<Player.Move> moves) {
-            return walls.stream().filter(Player.Wall::isHorizontal).noneMatch(w -> w.blocks(x, y + 1, x, y))
+            return walls.stream().filter(Player.Wall::isHorizontal).noneMatch(w -> w.blocks(x, y - 1, x, y))
                     && y - 1 >= 0
                     && hasNotBeenAtLocation(moves, x, y - 1);
         }
@@ -132,7 +132,7 @@ class Player {
         }
 
         private boolean canGoLeft(int x, int y, List<Player.Move> moves) {
-            return walls.stream().filter(w -> !w.isHorizontal()).noneMatch(w -> w.blocks(x + 1, y, x, y))
+            return walls.stream().filter(w -> !w.isHorizontal()).noneMatch(w -> w.blocks(x-1, y, x, y))
                     && x - 1 >= 0
                     && hasNotBeenAtLocation(moves, x - 1, y);
         }
