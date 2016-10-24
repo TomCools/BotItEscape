@@ -31,9 +31,16 @@ class Player {
                 }
             }
             if (roundCounter == 1) {
-                int[] target = calculateTarget(me.getX(), me.getY(), w, h);
-                targetX = target[0];
-                targetY = target[1];
+                if (myId == 0) {
+                    targetX = w - 1;
+                    targetY = me.y;
+                } else if (myId == 1) {
+                    targetX = 0;
+                    targetY = me.y;
+                } else if(myId == 2) {
+                    targetX = me.x;
+                    targetY = h-1;
+                }
             }
             int wallCount = in.nextInt(); // number of walls on the board
             walls = new ArrayList<Wall>();
@@ -50,20 +57,6 @@ class Player {
             String calculatedMove = round.calculateMove();
             System.out.println(calculatedMove);
         }
-    }
-
-    static int[] calculateTarget(int startX, int startY, int width, int height) {
-        int[] result = new int[2];
-        if (startX == 0 || startX == width - 1) {
-            result[0] = Math.abs(startY - width -1);
-            result[1] = startY;
-        } else if (startY == 0 || startY == height - 1) {
-            result[1] = Math.abs(startY - height -1);
-            result[0] = startX;
-        } else {
-            throw new IllegalStateException("Couldn't calculate correct target");
-        }
-        return result;
     }
 
     static class Round {
