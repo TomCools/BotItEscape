@@ -1,12 +1,14 @@
 import java.util.*;
-import java.io.*;
-import java.math.*;
 
 /**
  * Auto-generated code below aims at helping you parse
  * the standard input according to the problem statement.
  **/
 class Player {
+    static int roundCounter = 0;
+    static int targetX;
+    static int targetY;
+
     public static void main(String args[]) {
         Scanner in = new Scanner(System.in);
         int w = in.nextInt(); // width of the board
@@ -17,16 +19,21 @@ class Player {
 
         // game loop
         while (true) {
+            roundCounter++;
             Dragon me = null;
             List<Wall> walls;
             for (int i = 0; i < playerCount; i++) {
                 int x = in.nextInt(); // x-coordinate of the player
                 int y = in.nextInt(); // y-coordinate of the player
                 int wallsLeft = in.nextInt(); // number of walls available for the player
-
                 if (i == myId) {
                     me = new Dragon(i, x, y, wallsLeft);
                 }
+            }
+            if (roundCounter == 1) {
+                int[] target = calculateTarget(me.getX(), me.getY(), w, h);
+                targetX = target[0];
+                targetY = target[1];
             }
             int wallCount = in.nextInt(); // number of walls on the board
             walls = new ArrayList<Wall>();
@@ -43,6 +50,20 @@ class Player {
             String calculatedMove = round.calculateMove();
             System.out.println(calculatedMove);
         }
+    }
+
+    static int[] calculateTarget(int startX, int startY, int width, int height) {
+        int[] result = new int[2];
+        if (startX == 0 || startX == width - 1) {
+            result[0] = Math.abs(startY - width);
+            result[1] = startY;
+        } else if (startY == 0 || startY == height - 1) {
+            result[1] = Math.abs(startY - height);
+            result[0] = startX;
+        } else {
+            throw new IllegalStateException("Couldn't calculate correct target");
+        }
+        return result;
     }
 
     static class Round {
@@ -62,10 +83,7 @@ class Player {
         }
 
         public String calculateMove() {
-            //for (int i = 0; i < boardHeight; i++) {
-            //    calculatePaths(me.x, me.y, boardWidth - 1, me.y, new ArrayList<>(), paths, 10);
-            //}
-            calculatePaths(me.x, me.y, boardWidth - 1, me.y, new ArrayList<>(), paths, 10);
+            calculatePaths(me.x, me.y, targetX, targetY, new ArrayList<>(), paths, 10);
             Optional<Player.Path> bestPath = paths.stream().min(Comparator.comparingInt(c -> c.getMoves().size()));
             return bestPath.get().getMoves().get(0).getDefinition();
         }
@@ -80,22 +98,22 @@ class Player {
             } else {
                 if (canGoRight(x, y, moves)) {
                     List<Player.Move> newMoves = new ArrayList<>(moves);
-                    newMoves.add(new Player.Move(moves.size(),1, 0, x, y));
+                    newMoves.add(new Player.Move(moves.size(), 1, 0, x, y));
                     calculatePaths(x + 1, y, tX, tY, newMoves, paths, depth - 1);
                 }
                 if (canGoLeft(x, y, moves)) {
                     List<Player.Move> newMoves = new ArrayList<>(moves);
-                    newMoves.add(new Player.Move(moves.size(),-1, 0, x, y));
+                    newMoves.add(new Player.Move(moves.size(), -1, 0, x, y));
                     calculatePaths(x - 1, y, tX, tY, newMoves, paths, depth - 1);
                 }
                 if (canGoDown(x, y, moves)) {
                     List<Player.Move> newMoves = new ArrayList<>(moves);
-                    newMoves.add(new Player.Move(moves.size(),0, 1, x, y));
+                    newMoves.add(new Player.Move(moves.size(), 0, 1, x, y));
                     calculatePaths(x, y + 1, tX, tY, newMoves, paths, depth - 1);
                 }
                 if (canGoUp(x, y, moves)) {
                     List<Player.Move> newMoves = new ArrayList<>(moves);
-                    newMoves.add(new Player.Move(moves.size(),0, -1, x, y));
+                    newMoves.add(new Player.Move(moves.size(), 0, -1, x, y));
                     calculatePaths(x, y - 1, tX, tY, newMoves, paths, depth - 1);
                 }
             }
