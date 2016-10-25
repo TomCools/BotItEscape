@@ -1,4 +1,5 @@
 import java.util.*;
+import java.util.function.Supplier;
 
 /**
  * Auto-generated code below aims at helping you parse
@@ -76,7 +77,6 @@ class Player {
         List<Player.Wall> walls;
         int myId;
         Map<Integer, Dragon> players;
-        List<Player.Path> paths = new ArrayList<>();
         int[][] heighestRemainingMovesForEachPosition;
 
         public Round(int boardHeight, int boardWidth, List<Player.Wall> walls, int myId, Map<Integer, Dragon> players) {
@@ -85,14 +85,19 @@ class Player {
             this.walls = walls;
             this.players = players;
             this.myId = myId;
-            this.heighestRemainingMovesForEachPosition = new int[boardWidth][boardHeight];
         }
 
         public String calculateMove() {
-            Dragon me = players.get(myId);
-            calculatePaths(me.id, me.x, me.y, me.targetX, me.targetY, new ArrayList<>(), paths, DEPTH);
-            Optional<Player.Path> bestPath = paths.stream().min(Comparator.comparingInt(c -> c.getMoves().size()));
-            return bestPath.get().getMoves().get(0).getDefinition();
+            Map<Integer, Path> bestPathPerPlayer = new HashMap<>();
+            for (Dragon dragon : players.values()) {
+                List<Player.Path> paths = new ArrayList<>();
+                this.heighestRemainingMovesForEachPosition = new int[boardWidth][boardHeight];
+                calculatePaths(dragon.id, dragon.x, dragon.y, dragon.targetX, dragon.targetY, new ArrayList<>(), paths, DEPTH);
+                Optional<Player.Path> bestPath = paths.stream().min(Comparator.comparingInt(c -> c.getMoves().size()));
+                bestPathPerPlayer.put(dragon.id, bestPath.orElseThrow((Supplier<RuntimeException>) () -> new IllegalStateException("no valid path found for: " + dragon.id)));
+            }
+
+            return bestPathPerPlayer.get(myId).getMoves().get(0).getDefinition();
         }
 
         private void calculatePaths(int playerId, int x, int y, int tX, int tY, List<Player.Move> moves, List<Player.Path> paths, int depth) {
@@ -103,44 +108,44 @@ class Player {
                 //end reached, don't spend more energy on trying to find the path
             } else {
                 if (isShorterThanPreviousPathAttempt(x, y, depth)) {
-                    attemptRight(x, y, tX, tY, moves, paths, depth);
-                    attemptLeft(x, y, tX, tY, moves, paths, depth);
-                    attemptDown(x, y, tX, tY, moves, paths, depth);
-                    attemptUp(x, y, tX, tY, moves, paths, depth);
+                    attemptRight(playerId, x, y, tX, tY, moves, paths, depth);
+                    attemptLeft(playerId, x, y, tX, tY, moves, paths, depth);
+                    attemptDown(playerId, x, y, tX, tY, moves, paths, depth);
+                    attemptUp(playerId, x, y, tX, tY, moves, paths, depth);
                 }
 
             }
         }
 
-        private void attemptUp(int x, int y, int tX, int tY, List<Move> moves, List<Path> paths, int depth) {
+        private void attemptUp(int playerId, int x, int y, int tX, int tY, List<Move> moves, List<Path> paths, int depth) {
             if (canGoUp(x, y, moves)) {
                 List<Move> newMoves = new ArrayList<>(moves);
                 newMoves.add(new Move(moves.size(), 0, -1, x, y));
-                calculatePaths(x, y - 1, tX, tY, newMoves, paths, depth - 1);
+                calculatePaths(playerId, x, y - 1, tX, tY, newMoves, paths, depth - 1);
             }
         }
 
-        private void attemptDown(int x, int y, int tX, int tY, List<Move> moves, List<Path> paths, int depth) {
+        private void attemptDown(int playerId, int x, int y, int tX, int tY, List<Move> moves, List<Path> paths, int depth) {
             if (canGoDown(x, y, moves)) {
                 List<Move> newMoves = new ArrayList<>(moves);
                 newMoves.add(new Move(moves.size(), 0, 1, x, y));
-                calculatePaths(x, y + 1, tX, tY, newMoves, paths, depth - 1);
+                calculatePaths(playerId, x, y + 1, tX, tY, newMoves, paths, depth - 1);
             }
         }
 
-        private void attemptLeft(int x, int y, int tX, int tY, List<Move> moves, List<Path> paths, int depth) {
+        private void attemptLeft(int playerId, int x, int y, int tX, int tY, List<Move> moves, List<Path> paths, int depth) {
             if (canGoLeft(x, y, moves)) {
                 List<Move> newMoves = new ArrayList<>(moves);
                 newMoves.add(new Move(moves.size(), -1, 0, x, y));
-                calculatePaths(x - 1, y, tX, tY, newMoves, paths, depth - 1);
+                calculatePaths(playerId, x - 1, y, tX, tY, newMoves, paths, depth - 1);
             }
         }
 
-        private void attemptRight(int x, int y, int tX, int tY, List<Move> moves, List<Path> paths, int depth) {
+        private void attemptRight(int playerId, int x, int y, int tX, int tY, List<Move> moves, List<Path> paths, int depth) {
             if (canGoRight(x, y, moves)) {
                 List<Move> newMoves = new ArrayList<>(moves);
                 newMoves.add(new Move(moves.size(), 1, 0, x, y));
-                calculatePaths(x + 1, y, tX, tY, newMoves, paths, depth - 1);
+                calculatePaths(playerId, x + 1, y, tX, tY, newMoves, paths, depth - 1);
             }
         }
 
