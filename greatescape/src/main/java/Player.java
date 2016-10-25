@@ -6,46 +6,34 @@ import java.util.*;
  **/
 class Player {
     static final int DEPTH = 40;
-    static int roundCounter = 0;
-    static int targetX;
-    static int targetY;
-    static int enemyY;
+    static int w;
+    static int h;
 
     public static void main(String args[]) {
         Scanner in = new Scanner(System.in);
-        int w = in.nextInt(); // width of the board
-        int h = in.nextInt(); // height of the board
+        w = in.nextInt(); // width of the board
+        h = in.nextInt(); // height of the board
         int playerCount = in.nextInt(); // number of players (2 or 3)
         int myId = in.nextInt(); // id of my player (0 = 1st player, 1 = 2nd player, ...)
+
+        Map<Integer, Dragon> dragons = new HashMap<>();
 
 
         // game loop
         while (true) {
-            roundCounter++;
-            Dragon me = null;
             List<Wall> walls;
             for (int i = 0; i < playerCount; i++) {
                 int x = in.nextInt(); // x-coordinate of the player
                 int y = in.nextInt(); // y-coordinate of the player
                 int wallsLeft = in.nextInt(); // number of walls available for the player
-                if (i == myId) {
-                    me = new Dragon(i, x, y, wallsLeft);
+                if (dragons.isEmpty()) {
+                    dragons.put(i, createDragon(i, x, y, wallsLeft));
                 } else {
-                    enemyY = y;
+                    Dragon dragon = dragons.get(i);
+                    dragon.setX(x);
+                    dragon.setY(y);
+                    dragon.setWallsLeft(wallsLeft);
                 }
-            }
-            if (roundCounter == 1) {
-                if (myId == 0) {
-                    targetX = w - 1;
-                    targetY = me.y;
-                } else if (myId == 1) {
-                    targetX = 0;
-                    targetY = me.y;
-                } else if (myId == 2) {
-                    targetX = me.x;
-                    targetY = h - 1;
-                }
-                System.err.println("TARGET: " + targetX + ":" + targetY);
             }
             int wallCount = in.nextInt(); // number of walls on the board
             walls = new ArrayList<Wall>();
@@ -58,39 +46,57 @@ class Player {
 
             // Write an action using System.out.println()
             // To debug: System.err.println("Debug messages...");
-            Round round = new Round(h, w, walls, me, new ArrayList<>());
+            Round round = new Round(h, w, walls, myId, dragons);
             String calculatedMove = round.calculateMove();
             System.out.println(calculatedMove + " FOR FRODO!");
 
         }
     }
 
+    static Dragon createDragon(int id, int x, int y, int wallsLeft) {
+        int targetX, targetY;
+        if (id == 0) {
+            targetX = w - 1;
+            targetY = y;
+        } else if (id == 1) {
+            targetX = 0;
+            targetY = y;
+        } else if (id == 2) {
+            targetX = x;
+            targetY = h - 1;
+        } else {
+            throw new IllegalArgumentException("Invalid player id: " + id);
+        }
+        return new Dragon(id, x, y, wallsLeft, targetX, targetY);
+    }
+
     static class Round {
         int boardHeight;
         int boardWidth;
         List<Player.Wall> walls;
-        Player.Dragon me;
-        List<Player.Dragon> others;
+        int myId;
+        Map<Integer, Dragon> players;
         List<Player.Path> paths = new ArrayList<>();
         int[][] heighestRemainingMovesForEachPosition;
 
-        public Round(int boardHeight, int boardWidth, List<Player.Wall> walls, Player.Dragon me, List<Player.Dragon> others) {
+        public Round(int boardHeight, int boardWidth, List<Player.Wall> walls, int myId, Map<Integer, Dragon> players) {
             this.boardHeight = boardHeight;
             this.boardWidth = boardWidth;
             this.walls = walls;
-            this.me = me;
-            this.others = others;
+            this.players = players;
+            this.myId = myId;
             this.heighestRemainingMovesForEachPosition = new int[boardWidth][boardHeight];
         }
 
         public String calculateMove() {
-            calculatePaths(me.x, me.y, targetX, targetY, new ArrayList<>(), paths, DEPTH);
+            Dragon me = players.get(myId);
+            calculatePaths(me.id, me.x, me.y, me.targetX, me.targetY, new ArrayList<>(), paths, DEPTH);
             Optional<Player.Path> bestPath = paths.stream().min(Comparator.comparingInt(c -> c.getMoves().size()));
             return bestPath.get().getMoves().get(0).getDefinition();
         }
 
-        private void calculatePaths(int x, int y, int tX, int tY, List<Player.Move> moves, List<Player.Path> paths, int depth) {
-            if (reachedHorizontalTarget(x, tX) || reachedVerticalTarget(y, tY)) {
+        private void calculatePaths(int playerId, int x, int y, int tX, int tY, List<Player.Move> moves, List<Player.Path> paths, int depth) {
+            if (reachedHorizontalTarget(x, tX, playerId) || reachedVerticalTarget(y, tY, playerId)) {
                 //System.err.println("Path added");
                 paths.add(new Player.Path(moves));
             } else if (depth == 0) {
@@ -146,12 +152,12 @@ class Player {
             return false;
         }
 
-        private boolean reachedVerticalTarget(int y, int tY) {
-            return y == tY && me.getId() == 2;
+        private boolean reachedVerticalTarget(int y, int tY, int playerId) {
+            return y == tY && playerId == 2;
         }
 
-        private boolean reachedHorizontalTarget(int x, int tX) {
-            return x == tX && (me.getId() == 0 || me.getId() == 1);
+        private boolean reachedHorizontalTarget(int x, int tX, int playerId) {
+            return x == tX && (playerId == 0 || playerId == 1);
         }
 
         private boolean canGoUp(int x, int y, List<Player.Move> moves) {
@@ -235,32 +241,32 @@ class Player {
     }
 
     static class Dragon {
-        int id;
+        final int id;
         int x;
         int y;
         int wallsLeft;
+        final int targetX;
+        final int targetY;
 
-        public Dragon(int id, int x, int y, int wallsLeft) {
+        public Dragon(int id, int x, int y, int wallsLeft, int targetX, int targetY) {
             this.id = id;
             this.x = x;
             this.y = y;
             this.wallsLeft = wallsLeft;
+            this.targetX = targetX;
+            this.targetY = targetY;
         }
 
-        public int getId() {
-            return id;
+        public void setX(int x) {
+            this.x = x;
         }
 
-        public int getX() {
-            return x;
+        public void setY(int y) {
+            this.y = y;
         }
 
-        public int getY() {
-            return y;
-        }
-
-        public int getWallsLeft() {
-            return wallsLeft;
+        public void setWallsLeft(int wallsLeft) {
+            this.wallsLeft = wallsLeft;
         }
     }
 
