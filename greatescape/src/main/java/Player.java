@@ -1,20 +1,23 @@
 import java.util.*;
 import java.util.function.Supplier;
 
+import static java.util.stream.Collectors.toList;
+
 /**
  * Auto-generated code below aims at helping you parse
  * the standard input according to the problem statement.
  **/
 class Player {
-    static final int DEPTH = 40;
+    static final int DEPTH = 20;
     static int w;
     static int h;
+    static int playerCount;
 
     public static void main(String args[]) {
         Scanner in = new Scanner(System.in);
         w = in.nextInt(); // width of the board
         h = in.nextInt(); // height of the board
-        int playerCount = in.nextInt(); // number of players (2 or 3)
+        playerCount = in.nextInt(); // number of players (2 or 3)
         int myId = in.nextInt(); // id of my player (0 = 1st player, 1 = 2nd player, ...)
 
         Map<Integer, Dragon> dragons = new HashMap<>();
@@ -49,7 +52,7 @@ class Player {
             // To debug: System.err.println("Debug messages...");
             Round round = new Round(h, w, walls, myId, dragons);
             String calculatedMove = round.calculateMove();
-            System.out.println(calculatedMove + " FOR FRODO!");
+            System.out.println(calculatedMove);
 
         }
     }
@@ -89,13 +92,23 @@ class Player {
         public String calculateMove() {
             Map<Integer, Path> bestPathPerPlayer = new HashMap<>();
             PathCalculation normalPathCalculation = new PathCalculation(walls);
-            for (Dragon dragon : players.values()) {
+            for (Dragon dragon : players.values().stream().filter(Dragon::isAlive).collect(toList())) {
                 List<Path> paths = normalPathCalculation.calculateFor(dragon.id, dragon.x, dragon.y, dragon.targetX, dragon.targetY);
                 Optional<Player.Path> bestPath = paths.stream().min(Comparator.comparingInt(c -> c.getMoves().size()));
                 bestPathPerPlayer.put(dragon.id, bestPath.orElseThrow((Supplier<RuntimeException>) () -> new IllegalStateException("no valid path found for: " + dragon.id)));
             }
 
-            return bestPathPerPlayer.get(myId).getMoves().get(0).getDefinition();
+            String expectedResult = "Unkown";
+            if (playerCount == 2) {
+                Map.Entry<Integer, Path> otherPlayer = bestPathPerPlayer.entrySet().stream().filter(p -> p.getKey() != myId).collect(toList()).get(0);
+                Path myPath = bestPathPerPlayer.get(myId);
+                if (otherPlayer.getValue().length() > myPath.length() || (otherPlayer.getValue().length() == myPath.length() && myId < otherPlayer.getKey())) {
+                    expectedResult = "WINNING!";
+                } else {
+                    expectedResult = "LOSING";
+                }
+            }
+            return bestPathPerPlayer.get(myId).getMoves().get(0).getDefinition() + " " + expectedResult;
         }
 
 
@@ -110,6 +123,8 @@ class Player {
             public List<Path> calculateFor(int playerId, int x, int y, int tX, int tY) {
                 heighestRemainingMovesForEachPosition = new int[w][h];
                 List<Player.Path> paths = new ArrayList<>();
+
+                System.err.println("Calculating path for: " + playerId + x + y + tX + tY);
                 calculatePaths(playerId, x, y, tX, tY, new ArrayList<>(), paths, DEPTH);
                 return paths;
             }
@@ -164,6 +179,7 @@ class Player {
             }
 
             private boolean isShorterThanPreviousPathAttempt(int x, int y, int depth) {
+                //System.err.println(heighestRemainingMovesForEachPosition);
                 if (heighestRemainingMovesForEachPosition[x][y] < depth) {
                     heighestRemainingMovesForEachPosition[x][y] = depth;
                     return true;
@@ -258,6 +274,10 @@ class Player {
         public List<Move> getMoves() {
             return moves;
         }
+
+        public int length() {
+            return moves.size();
+        }
     }
 
     static class Dragon {
@@ -287,6 +307,14 @@ class Player {
 
         public void setWallsLeft(int wallsLeft) {
             this.wallsLeft = wallsLeft;
+        }
+
+        public boolean isDead() {
+            return x == -1 || y == -1;
+        }
+
+        public boolean isAlive() {
+            return !isDead();
         }
     }
 
