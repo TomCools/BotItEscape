@@ -27,13 +27,13 @@ class Player {
                 int x = in.nextInt(); // x-coordinate of the player
                 int y = in.nextInt(); // y-coordinate of the player
                 int wallsLeft = in.nextInt(); // number of walls available for the player
-                if (dragons.isEmpty()) {
+                Dragon d = dragons.get(i);
+                if (d == null) {
                     dragons.put(i, createDragon(i, x, y, wallsLeft));
                 } else {
-                    Dragon dragon = dragons.get(i);
-                    dragon.setX(x);
-                    dragon.setY(y);
-                    dragon.setWallsLeft(wallsLeft);
+                    d.setX(x);
+                    d.setY(y);
+                    d.setWallsLeft(wallsLeft);
                 }
             }
             int wallCount = in.nextInt(); // number of walls on the board
@@ -77,7 +77,6 @@ class Player {
         List<Player.Wall> walls;
         int myId;
         Map<Integer, Dragon> players;
-        int[][] heighestRemainingMovesForEachPosition;
 
         public Round(int boardHeight, int boardWidth, List<Player.Wall> walls, int myId, Map<Integer, Dragon> players) {
             this.boardHeight = boardHeight;
@@ -89,10 +88,9 @@ class Player {
 
         public String calculateMove() {
             Map<Integer, Path> bestPathPerPlayer = new HashMap<>();
+            PathCalculation normalPathCalculation = new PathCalculation(walls);
             for (Dragon dragon : players.values()) {
-                List<Player.Path> paths = new ArrayList<>();
-                this.heighestRemainingMovesForEachPosition = new int[boardWidth][boardHeight];
-                calculatePaths(dragon.id, dragon.x, dragon.y, dragon.targetX, dragon.targetY, new ArrayList<>(), paths, DEPTH);
+                List<Path> paths = normalPathCalculation.calculateFor(dragon.id, dragon.x, dragon.y, dragon.targetX, dragon.targetY);
                 Optional<Player.Path> bestPath = paths.stream().min(Comparator.comparingInt(c -> c.getMoves().size()));
                 bestPathPerPlayer.put(dragon.id, bestPath.orElseThrow((Supplier<RuntimeException>) () -> new IllegalStateException("no valid path found for: " + dragon.id)));
             }
@@ -100,97 +98,114 @@ class Player {
             return bestPathPerPlayer.get(myId).getMoves().get(0).getDefinition();
         }
 
-        private void calculatePaths(int playerId, int x, int y, int tX, int tY, List<Player.Move> moves, List<Player.Path> paths, int depth) {
-            if (reachedHorizontalTarget(x, tX, playerId) || reachedVerticalTarget(y, tY, playerId)) {
-                //System.err.println("Path added");
-                paths.add(new Player.Path(moves));
-            } else if (depth == 0) {
-                //end reached, don't spend more energy on trying to find the path
-            } else {
-                if (isShorterThanPreviousPathAttempt(x, y, depth)) {
-                    attemptRight(playerId, x, y, tX, tY, moves, paths, depth);
-                    attemptLeft(playerId, x, y, tX, tY, moves, paths, depth);
-                    attemptDown(playerId, x, y, tX, tY, moves, paths, depth);
-                    attemptUp(playerId, x, y, tX, tY, moves, paths, depth);
+
+        static class PathCalculation {
+            private List<Wall> walls;
+            private int[][] heighestRemainingMovesForEachPosition;
+
+            public PathCalculation(List<Wall> walls) {
+                this.walls = walls;
+            }
+
+            public List<Path> calculateFor(int playerId, int x, int y, int tX, int tY) {
+                heighestRemainingMovesForEachPosition = new int[w][h];
+                List<Player.Path> paths = new ArrayList<>();
+                calculatePaths(playerId, x, y, tX, tY, new ArrayList<>(), paths, DEPTH);
+                return paths;
+            }
+
+            private void calculatePaths(int playerId, int x, int y, int tX, int tY, List<Player.Move> moves, List<Player.Path> paths, int depth) {
+                if (reachedHorizontalTarget(x, tX, playerId) || reachedVerticalTarget(y, tY, playerId)) {
+                    //System.err.println("Path added");
+                    paths.add(new Player.Path(moves));
+                } else if (depth == 0) {
+                    //end reached, don't spend more energy on trying to find the path
+                } else {
+                    if (isShorterThanPreviousPathAttempt(x, y, depth)) {
+                        attemptRight(playerId, x, y, tX, tY, moves, paths, depth);
+                        attemptLeft(playerId, x, y, tX, tY, moves, paths, depth);
+                        attemptDown(playerId, x, y, tX, tY, moves, paths, depth);
+                        attemptUp(playerId, x, y, tX, tY, moves, paths, depth);
+                    }
+
                 }
-
             }
-        }
 
-        private void attemptUp(int playerId, int x, int y, int tX, int tY, List<Move> moves, List<Path> paths, int depth) {
-            if (canGoUp(x, y, moves)) {
-                List<Move> newMoves = new ArrayList<>(moves);
-                newMoves.add(new Move(moves.size(), 0, -1, x, y));
-                calculatePaths(playerId, x, y - 1, tX, tY, newMoves, paths, depth - 1);
+            private void attemptUp(int playerId, int x, int y, int tX, int tY, List<Move> moves, List<Path> paths, int depth) {
+                if (canGoUp(x, y, moves)) {
+                    List<Move> newMoves = new ArrayList<>(moves);
+                    newMoves.add(new Move(moves.size(), 0, -1, x, y));
+                    calculatePaths(playerId, x, y - 1, tX, tY, newMoves, paths, depth - 1);
+                }
             }
-        }
 
-        private void attemptDown(int playerId, int x, int y, int tX, int tY, List<Move> moves, List<Path> paths, int depth) {
-            if (canGoDown(x, y, moves)) {
-                List<Move> newMoves = new ArrayList<>(moves);
-                newMoves.add(new Move(moves.size(), 0, 1, x, y));
-                calculatePaths(playerId, x, y + 1, tX, tY, newMoves, paths, depth - 1);
+            private void attemptDown(int playerId, int x, int y, int tX, int tY, List<Move> moves, List<Path> paths, int depth) {
+                if (canGoDown(x, y, moves)) {
+                    List<Move> newMoves = new ArrayList<>(moves);
+                    newMoves.add(new Move(moves.size(), 0, 1, x, y));
+                    calculatePaths(playerId, x, y + 1, tX, tY, newMoves, paths, depth - 1);
+                }
             }
-        }
 
-        private void attemptLeft(int playerId, int x, int y, int tX, int tY, List<Move> moves, List<Path> paths, int depth) {
-            if (canGoLeft(x, y, moves)) {
-                List<Move> newMoves = new ArrayList<>(moves);
-                newMoves.add(new Move(moves.size(), -1, 0, x, y));
-                calculatePaths(playerId, x - 1, y, tX, tY, newMoves, paths, depth - 1);
+            private void attemptLeft(int playerId, int x, int y, int tX, int tY, List<Move> moves, List<Path> paths, int depth) {
+                if (canGoLeft(x, y, moves)) {
+                    List<Move> newMoves = new ArrayList<>(moves);
+                    newMoves.add(new Move(moves.size(), -1, 0, x, y));
+                    calculatePaths(playerId, x - 1, y, tX, tY, newMoves, paths, depth - 1);
+                }
             }
-        }
 
-        private void attemptRight(int playerId, int x, int y, int tX, int tY, List<Move> moves, List<Path> paths, int depth) {
-            if (canGoRight(x, y, moves)) {
-                List<Move> newMoves = new ArrayList<>(moves);
-                newMoves.add(new Move(moves.size(), 1, 0, x, y));
-                calculatePaths(playerId, x + 1, y, tX, tY, newMoves, paths, depth - 1);
+            private void attemptRight(int playerId, int x, int y, int tX, int tY, List<Move> moves, List<Path> paths, int depth) {
+                if (canGoRight(x, y, moves)) {
+                    List<Move> newMoves = new ArrayList<>(moves);
+                    newMoves.add(new Move(moves.size(), 1, 0, x, y));
+                    calculatePaths(playerId, x + 1, y, tX, tY, newMoves, paths, depth - 1);
+                }
             }
-        }
 
-        private boolean isShorterThanPreviousPathAttempt(int x, int y, int depth) {
-            if (heighestRemainingMovesForEachPosition[x][y] < depth) {
-                heighestRemainingMovesForEachPosition[x][y] = depth;
-                return true;
+            private boolean isShorterThanPreviousPathAttempt(int x, int y, int depth) {
+                if (heighestRemainingMovesForEachPosition[x][y] < depth) {
+                    heighestRemainingMovesForEachPosition[x][y] = depth;
+                    return true;
+                }
+                return false;
             }
-            return false;
-        }
 
-        private boolean reachedVerticalTarget(int y, int tY, int playerId) {
-            return y == tY && playerId == 2;
-        }
+            private boolean reachedVerticalTarget(int y, int tY, int playerId) {
+                return y == tY && playerId == 2;
+            }
 
-        private boolean reachedHorizontalTarget(int x, int tX, int playerId) {
-            return x == tX && (playerId == 0 || playerId == 1);
-        }
+            private boolean reachedHorizontalTarget(int x, int tX, int playerId) {
+                return x == tX && (playerId == 0 || playerId == 1);
+            }
 
-        private boolean canGoUp(int x, int y, List<Player.Move> moves) {
-            return walls.stream().filter(Player.Wall::isHorizontal).noneMatch(w -> w.blocks(x, y - 1, x, y))
-                    && y - 1 >= 0
-                    && hasNotBeenAtLocation(moves, x, y - 1);
-        }
+            private boolean canGoUp(int x, int y, List<Player.Move> moves) {
+                return walls.stream().filter(Player.Wall::isHorizontal).noneMatch(w -> w.blocks(x, y - 1, x, y))
+                        && y - 1 >= 0
+                        && hasNotBeenAtLocation(moves, x, y - 1);
+            }
 
-        private boolean canGoDown(int x, int y, List<Player.Move> moves) {
-            return walls.stream().filter(Player.Wall::isHorizontal).noneMatch(w -> w.blocks(x, y, x, y + 1))
-                    && y + 1 < this.boardHeight
-                    && hasNotBeenAtLocation(moves, x, y + 1);
-        }
+            private boolean canGoDown(int x, int y, List<Player.Move> moves) {
+                return walls.stream().filter(Player.Wall::isHorizontal).noneMatch(w -> w.blocks(x, y, x, y + 1))
+                        && y + 1 < h
+                        && hasNotBeenAtLocation(moves, x, y + 1);
+            }
 
-        private boolean canGoLeft(int x, int y, List<Player.Move> moves) {
-            return walls.stream().filter(w -> !w.isHorizontal()).noneMatch(w -> w.blocks(x - 1, y, x, y))
-                    && x - 1 >= 0
-                    && hasNotBeenAtLocation(moves, x - 1, y);
-        }
+            private boolean canGoLeft(int x, int y, List<Player.Move> moves) {
+                return walls.stream().filter(w -> !w.isHorizontal()).noneMatch(w -> w.blocks(x - 1, y, x, y))
+                        && x - 1 >= 0
+                        && hasNotBeenAtLocation(moves, x - 1, y);
+            }
 
-        private boolean canGoRight(int x, int y, List<Player.Move> moves) {
-            return walls.stream().filter(w -> !w.isHorizontal()).noneMatch(w -> w.blocks(x, y, x + 1, y))
-                    && x + 1 < this.boardWidth
-                    && hasNotBeenAtLocation(moves, x + 1, y);
-        }
+            private boolean canGoRight(int x, int y, List<Player.Move> moves) {
+                return walls.stream().filter(w -> !w.isHorizontal()).noneMatch(w -> w.blocks(x, y, x + 1, y))
+                        && x + 1 < w
+                        && hasNotBeenAtLocation(moves, x + 1, y);
+            }
 
-        private boolean hasNotBeenAtLocation(List<Player.Move> moves, int newX, int newY) {
-            return moves.stream().noneMatch(m -> m.x == newX && m.y == newY);
+            private boolean hasNotBeenAtLocation(List<Player.Move> moves, int newX, int newY) {
+                return moves.stream().noneMatch(m -> m.x == newX && m.y == newY);
+            }
         }
     }
 
