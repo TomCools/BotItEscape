@@ -93,22 +93,121 @@ class Player {
             Map<Integer, Path> bestPathPerPlayer = new HashMap<>();
             PathCalculation normalPathCalculation = new PathCalculation(walls);
             for (Dragon dragon : players.values().stream().filter(Dragon::isAlive).collect(toList())) {
-                List<Path> paths = normalPathCalculation.calculateFor(dragon.id, dragon.x, dragon.y, dragon.targetX, dragon.targetY);
-                Optional<Player.Path> bestPath = paths.stream().min(Comparator.comparingInt(c -> c.getMoves().size()));
+                Optional<Path> bestPath = normalPathCalculation.bestPath(dragon.id, dragon.x, dragon.y, dragon.targetX, dragon.targetY);
                 bestPathPerPlayer.put(dragon.id, bestPath.orElseThrow((Supplier<RuntimeException>) () -> new IllegalStateException("no valid path found for: " + dragon.id)));
             }
 
             String expectedResult = "Unkown";
             if (playerCount == 2) {
-                Map.Entry<Integer, Path> otherPlayer = bestPathPerPlayer.entrySet().stream().filter(p -> p.getKey() != myId).collect(toList()).get(0);
+                int otherplayer = myId == 0 ? 1 : 0;
+                Map.Entry<Integer, Path> otherPlayer = bestPathPerPlayer.entrySet().stream().filter(p -> p.getKey() == otherplayer).collect(toList()).get(0);
                 Path myPath = bestPathPerPlayer.get(myId);
                 if (otherPlayer.getValue().length() > myPath.length() || (otherPlayer.getValue().length() == myPath.length() && myId < otherPlayer.getKey())) {
                     expectedResult = "WINNING!";
+                    return bestPathPerPlayer.get(myId).getMoves().get(0).getDefinition() + " " + expectedResult;
                 } else {
                     expectedResult = "LOSING";
+                    Wall wall = new WallCalculation(walls).selectMostImpactOnOpponentWall(players.get(otherplayer));
+                    if (wall != null) {
+                        return wall.toString() + " BOOM! A Wall!";
+                    }
+                    //else just move, we lost anyway..
                 }
             }
             return bestPathPerPlayer.get(myId).getMoves().get(0).getDefinition() + " " + expectedResult;
+        }
+
+        //class responsible for placing a wall with the highest effect on other players
+        static class WallCalculation {
+            private List<Wall> defaultWalls;
+            private Random r = new Random();
+
+            public WallCalculation(List<Wall> defaultWalls) {
+                this.defaultWalls = defaultWalls;
+            }
+
+            public Wall selectMostImpactOnOpponentWall(Dragon d) {
+                List<Wall> walls = filterPotentialTwoPlayerWalls(d);
+                Wall worstWall = null;
+                int worstPathLength = 0;
+                for (Wall newWall : walls) {
+                    if (worstWall == null) {
+                        List<Wall> testWalls = new ArrayList<Wall>(defaultWalls);
+                        testWalls.add(newWall);
+                        Optional<Path> path = new PathCalculation(testWalls).bestPath(d.id, d.x, d.y, d.targetX, d.targetY);
+                        if (path.isPresent()) {
+                            worstWall = newWall;
+                            worstPathLength = path.get().length();
+                        }
+                    } else {
+                        List<Wall> testWalls = new ArrayList<Wall>(defaultWalls);
+                        testWalls.add(newWall);
+                        Optional<Path> path = new PathCalculation(testWalls).bestPath(d.id, d.x, d.y, d.targetX, d.targetY);
+                        if (path.isPresent() && path.get().length() > worstPathLength) {
+                            worstWall = newWall;
+                            worstPathLength = path.get().length();
+                        }
+                    }
+                }
+                return worstWall;
+            }
+
+            public Wall selectRandomValidWall(Dragon otherPlayer) {
+                List<Wall> walls = filterPotentialTwoPlayerWalls(otherPlayer);
+
+                int selectedRandomWall = r.nextInt(walls.size() - 1);
+                return walls.get(selectedRandomWall);
+            }
+
+            private List<Wall> filterPotentialTwoPlayerWalls(Dragon otherPlayer) {
+                int RANGE = 2;
+                List<Wall> validWalls = new ArrayList<>();
+                for (int x = otherPlayer.x - RANGE; x < w || x < otherPlayer.x + RANGE; x++) {
+                    for (int y = otherPlayer.y - RANGE; y < h || y < otherPlayer.y + RANGE; y++) {
+                        if (isValidWallPlacement(x, y, true)) {
+                            validWalls.add(new Wall(x, y, true));
+                        }
+                        if (isValidWallPlacement(x, y, false)) {
+                            validWalls.add(new Wall(x, y, false));
+                        }
+                    }
+                }
+                return validWalls;
+            }
+
+            private boolean isValidWallPlacement(int x, int y, boolean isHorizontal) {
+                if (isHorizontal) {
+                    return horizontalWallWithinBoard(x) && noOtherBlockingHorizontalWall(x) && verticalWithinBoard(y);
+                } else {
+                    return verticalWallWithinBoard(y) && noOtherBlockingVerticalWall(y) && horizontalWithinBoard(x);
+                }
+            }
+
+            //OPTIMIZE IF_ELSE
+            private boolean noOtherBlockingVerticalWall(int y) {
+                return defaultWalls.stream().noneMatch(w -> (w.y == y || w.y == y + 1 || w.y == y - 1));
+            }
+
+            //OPTIMIZE IF_ELSE
+            private boolean noOtherBlockingHorizontalWall(int x) {
+                return defaultWalls.stream().noneMatch(w -> (w.x == x || w.x == x + 1 || w.x == x - 1));
+            }
+
+            private boolean horizontalWallWithinBoard(int x) {
+                return !(x < 0 || (x > w - 2));
+            }
+
+            private boolean verticalWallWithinBoard(int y) {
+                return !(y < 0 || (y > h - 2));
+            }
+
+            private boolean horizontalWithinBoard(int x) {
+                return x >= 0 && x < w;
+            }
+
+            private boolean verticalWithinBoard(int y) {
+                return y >= 0 && y < h;
+            }
         }
 
 
@@ -120,13 +219,18 @@ class Player {
                 this.walls = walls;
             }
 
-            public List<Path> calculateFor(int playerId, int x, int y, int tX, int tY) {
+            public List<Path> calculateAllPossiblePaths(int playerId, int x, int y, int tX, int tY) {
                 heighestRemainingMovesForEachPosition = new int[w][h];
                 List<Player.Path> paths = new ArrayList<>();
 
                 System.err.println("Calculating path for: " + playerId + x + y + tX + tY);
                 calculatePaths(playerId, x, y, tX, tY, new ArrayList<>(), paths, DEPTH);
                 return paths;
+            }
+
+            public Optional<Path> bestPath(int id, int x, int y, int targetX, int targetY) {
+                List<Path> paths = calculateAllPossiblePaths(id, x, y, targetX, targetY);
+                return paths.stream().min(Comparator.comparingInt(c -> c.getMoves().size()));
             }
 
             private void calculatePaths(int playerId, int x, int y, int tX, int tY, List<Player.Move> moves, List<Player.Path> paths, int depth) {
@@ -222,6 +326,8 @@ class Player {
             private boolean hasNotBeenAtLocation(List<Player.Move> moves, int newX, int newY) {
                 return moves.stream().noneMatch(m -> m.x == newX && m.y == newY);
             }
+
+
         }
     }
 
@@ -348,6 +454,12 @@ class Player {
             } else {
                 return (y1 == y - 1 && y2 == y && x1 >= x && x1 < x + LENGTH);
             }
+        }
+
+        @Override
+        public String toString() {
+            String direction = isHorizontal ? "H" : "V";
+            return x + " " + y + " " + direction;
         }
     }
 }
